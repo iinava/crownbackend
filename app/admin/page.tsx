@@ -1,6 +1,4 @@
 import { getAllRooms } from "@/lib/dal/rooms";
-
-export const dynamic = "force-dynamic";
 import { getUnpaidThisMonth } from "@/lib/dal/payments";
 import { getResidents } from "@/lib/dal/residents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { BedDouble, Users, AlertCircle, CheckCircle2, DoorOpen, TrendingDown } from "lucide-react";
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const [rooms, unpaid, { total: totalResidents }] = await Promise.all([
