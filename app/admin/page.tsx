@@ -1,9 +1,10 @@
 import { getAllRooms } from "@/lib/dal/rooms";
 import { getUnpaidThisMonth } from "@/lib/dal/payments";
 import { getResidents } from "@/lib/dal/residents";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-import { BedDouble, Users, AlertCircle, CheckCircle2, DoorOpen, TrendingDown } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { BedDouble, Users, DoorOpen, TrendingDown, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 export default async function AdminDashboard() {
@@ -20,149 +21,103 @@ export default async function AdminDashboard() {
   const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
 
   const stats = [
-    {
-      label: "Total Beds",
-      value: totalBeds,
-      sub: `${rooms.length} rooms`,
-      icon: BedDouble,
-      colorClass: "text-primary bg-primary/10",
-    },
-    {
-      label: "Occupied",
-      value: occupiedBeds,
-      sub: `${occupancyPct}% occupancy`,
-      icon: Users,
-      colorClass: "text-success bg-success/10",
-    },
-    {
-      label: "Vacant",
-      value: vacantBeds,
-      sub: `${totalBeds - occupiedBeds} beds free`,
-      icon: DoorOpen,
-      colorClass: "text-warning bg-warning/10",
-    },
-    {
-      label: "Unpaid",
-      value: unpaid.length,
-      sub: monthLabel,
-      icon: TrendingDown,
-      colorClass: "text-destructive bg-destructive/10",
-    },
+    { label: "Total Beds",  value: totalBeds,      sub: `${rooms.length} rooms`,          icon: BedDouble    },
+    { label: "Occupied",    value: occupiedBeds,   sub: `${occupancyPct}% occupancy`,     icon: Users        },
+    { label: "Vacant",      value: vacantBeds,     sub: `${vacantBeds} beds free`,        icon: DoorOpen     },
+    { label: "Unpaid",      value: unpaid.length,  sub: monthLabel,                       icon: TrendingDown },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Page header */}
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Crown Hostel — overview for {monthLabel}
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Crown Hostel — {monthLabel}
         </p>
       </div>
 
-      {/* Alerts */}
+      {/* Banner */}
       {unpaid.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-destructive/30 bg-destructive/5 text-sm">
+        <div className="flex items-center gap-2.5 rounded-md border px-3.5 py-2.5 text-sm">
           <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-          <span className="font-medium text-destructive shrink-0">
-            {unpaid.length} unpaid
-          </span>
+          <span className="font-medium">{unpaid.length} unpaid this month</span>
           <span className="text-muted-foreground truncate min-w-0">
-            {unpaid.slice(0, 3).map((p) => p.resident_name).join(", ")}
-            {unpaid.length > 3 && (
-              <span className="text-destructive/70"> and {unpaid.length - 3} more</span>
-            )}
+            — {unpaid.slice(0, 3).map((p) => p.resident_name).join(", ")}
+            {unpaid.length > 3 && ` and ${unpaid.length - 3} more`}
           </span>
-          <Link
-            href="/admin/payments"
-            className="ml-auto shrink-0 text-xs font-medium text-destructive hover:underline"
-          >
-            View all →
+          <Link href="/admin/payments" className="ml-auto shrink-0 text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
+            View all
           </Link>
         </div>
       )}
 
       {unpaid.length === 0 && totalResidents > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-success/30 bg-success/5 text-sm">
-          <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-          <span className="font-medium text-success">All paid up</span>
-          <span className="text-muted-foreground">All residents are up to date for {monthLabel}</span>
+        <div className="flex items-center gap-2.5 rounded-md border px-3.5 py-2.5 text-sm">
+          <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-medium">All payments collected</span>
+          <span className="text-muted-foreground">for {monthLabel}</span>
         </div>
       )}
-
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
-          <Card key={s.label} className="shadow-sm border-border/60">
-            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <Card key={s.label}>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1.5">
+                <s.icon className="h-3.5 w-3.5" />
                 {s.label}
-              </CardTitle>
-              <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${s.colorClass}`}>
-                <s.icon className="h-4 w-4" />
-              </div>
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold tracking-tight">{s.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
+              <p className="text-2xl font-semibold tabular-nums">{s.value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{s.sub}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Occupancy bar */}
-      <Card className="shadow-sm border-border/60">
+      {/* Occupancy */}
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Overall Occupancy</CardTitle>
-            <span className="text-sm font-semibold text-primary">{occupancyPct}%</span>
+            <span className="text-sm tabular-nums text-muted-foreground">{occupancyPct}%</span>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${occupancyPct}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
+        <CardContent className="space-y-1.5">
+          <Progress value={occupancyPct} className="h-2" />
+          <p className="text-xs text-muted-foreground">
             {occupiedBeds} of {totalBeds} beds occupied across {rooms.length} rooms
           </p>
         </CardContent>
       </Card>
 
-      {/* Rooms grid */}
+      {/* Rooms at a glance */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Rooms at a glance</h2>
-          <Link href="/admin/rooms" className="text-xs text-primary hover:underline font-medium">
-            Manage rooms →
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium">Rooms at a glance</h2>
+          <Link href="/admin/rooms" className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
+            Manage rooms
           </Link>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {rooms.map((room) => {
-            const pct = Math.round((room.occupied_count / room.capacity) * 100);
+            const pct    = Math.round((room.occupied_count / room.capacity) * 100);
             const isFull = room.occupied_count >= room.capacity;
             return (
               <Link key={room.id} href={`/admin/rooms/${room.id}`}>
-                <Card className={`cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 border-border/60 ${isFull ? "border-destructive/30" : ""}`}>
+                <Card className="cursor-pointer hover:bg-accent transition-colors">
                   <CardContent className="p-3 text-center">
-                    <p className="font-bold text-sm">{room.number}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{room.floor_label}</p>
-                    <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${isFull ? "bg-destructive" : pct > 70 ? "bg-warning" : "bg-success"}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] font-medium mt-1.5">
+                    <p className="font-medium text-sm">{room.number}</p>
+                    <p className="text-[10px] text-muted-foreground">{room.floor_label}</p>
+                    <Progress value={pct} className="h-1 mt-2" />
+                    <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
                       {room.occupied_count}/{room.capacity}
                     </p>
                     {isFull && (
-                      <span className="inline-block text-[9px] font-semibold text-destructive bg-destructive/10 rounded px-1.5 py-0.5 mt-1">
-                        FULL
-                      </span>
+                      <span className="text-[10px] font-medium text-destructive">Full</span>
                     )}
                   </CardContent>
                 </Card>
