@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { BedDouble, Users, AlertCircle, CheckCircle2, DoorOpen, TrendingDown } from "lucide-react";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-
 export default async function AdminDashboard() {
   const [rooms, unpaid, { total: totalResidents }] = await Promise.all([
     getAllRooms(),
