@@ -12,6 +12,7 @@ import {
   BedDouble,
   ShieldCheck,
   ChevronRight,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -21,8 +22,9 @@ const navItems = [
   { href: "/admin",           label: "Dashboard",   icon: LayoutDashboard, exact: true },
   { href: "/admin/rooms",     label: "Rooms & Beds", icon: BedDouble },
   { href: "/admin/residents", label: "Residents",    icon: Users },
-  { href: "/admin/payments",  label: "Payments",     icon: CreditCard },
-  { href: "/admin/settings",  label: "Settings",     icon: Settings },
+  { href: "/admin/payments",       label: "Payments",      icon: CreditCard },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/settings",      label: "Settings",      icon: Settings },
   { href: "/admin/users",     label: "Admin Users",  icon: ShieldCheck },
 ];
 
