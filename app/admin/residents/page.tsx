@@ -7,10 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Users, CheckCircle2, Clock, BedDouble } from "lucide-react";
+import { Loader2, Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Users, CheckCircle2, Clock, BedDouble, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useHostel } from "@/lib/hostel-context";
+import { DatePicker } from "@/components/DatePicker";
+import { TableRowSkeleton } from "@/components/skeletons";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type StatusFilter = "active" | "inactive" | "all";
 
 interface Resident {
   id: number;
@@ -25,6 +36,7 @@ interface Resident {
   room_number: string | null;
   has_unpaid: boolean;
   has_payment: boolean;
+  move_out_date: string | null;
 }
 
 const LIMIT = 15;
@@ -39,6 +51,11 @@ export default function ResidentsPage() {
   const [editing, setEditing] = useState<Resident | null>(null);
   const [saving, setSaving] = useState(false);
   const [defaultRate, setDefaultRate] = useState("0");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [phoneError, setPhoneError] = useState("");
+  const [checkoutResident, setCheckoutResident] = useState<Resident | null>(null);
+  const [checkoutDate, setCheckoutDate] = useState("");
+  const [checkingOut, setCheckingOut] = useState(false);
   const { hostelParam, isLoading: hostelLoading } = useHostel();
 
   const [form, setForm] = useState({
@@ -51,8 +68,13 @@ export default function ResidentsPage() {
     setLoading(true);
     try {
       const hq = hostelParam ? `&hostel=${hostelParam}` : "";
+      const fq = statusFilter === "active"
+        ? "&active_only=true"
+        : statusFilter === "inactive"
+        ? "&inactive_only=true"
+        : "";
       const res = await fetch(
-        `/api/residents?search=${encodeURIComponent(search)}&limit=${LIMIT}&offset=${offset}${hq}`
+        `/api/residents?search=${encodeURIComponent(search)}&limit=${LIMIT}&offset=${offset}${hq}${fq}`
       );
       const data = await res.json();
       setResidents(data.data);
@@ -60,7 +82,7 @@ export default function ResidentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, offset, hostelParam, hostelLoading]);
+  }, [search, offset, hostelParam, hostelLoading, statusFilter]);
 
   useEffect(() => { fetchResidents(); }, [fetchResidents]);
 
@@ -70,16 +92,18 @@ export default function ResidentsPage() {
     });
   }, []);
 
-  useEffect(() => { setOffset(0); }, [search]);
+  useEffect(() => { setOffset(0); }, [search, statusFilter]);
 
   function openAdd() {
     setEditing(null);
+    setPhoneError("");
     setForm({ name: "", phone: "", email: "", id_number: "", monthly_rate: defaultRate, move_in_date: "", notes: "" });
     setDialogOpen(true);
   }
 
   function openEdit(r: Resident) {
     setEditing(r);
+    setPhoneError("");
     setForm({
       name: r.name, phone: r.phone ?? "", email: r.email ?? "",
       id_number: r.id_number ?? "", monthly_rate: r.monthly_rate,
@@ -90,6 +114,17 @@ export default function ResidentsPage() {
 
   async function handleSave() {
     if (!form.name.trim()) { toast.error("Name is required"); return; }
+    // Phone: required, must be exactly 10 digits
+    const phoneRegex = /^\d{10}$/;
+    if (!form.phone.trim()) {
+      setPhoneError("Phone number is required");
+      return;
+    }
+    if (!phoneRegex.test(form.phone.trim())) {
+      setPhoneError("Enter a valid 10-digit phone number");
+      return;
+    }
+    setPhoneError("");
     setSaving(true);
     try {
       const payload = { ...form, monthly_rate: Number(form.monthly_rate) || 0 };
@@ -124,6 +159,33 @@ export default function ResidentsPage() {
     }
   }
 
+  function openCheckout(r: Resident) {
+    setCheckoutResident(r);
+    setCheckoutDate(new Date().toISOString().slice(0, 10));
+  }
+
+  async function handleCheckout() {
+    if (!checkoutResident) return;
+    setCheckingOut(true);
+    try {
+      const res = await fetch(`/api/residents/${checkoutResident.id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ move_out_date: checkoutDate }),
+      });
+      if (res.ok) {
+        toast.success(`${checkoutResident.name} checked out`);
+        setCheckoutResident(null);
+        fetchResidents();
+      } else {
+        const d = await res.json();
+        toast.error(d.error ?? "Checkout failed");
+      }
+    } finally {
+      setCheckingOut(false);
+    }
+  }
+
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -133,22 +195,35 @@ export default function ResidentsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Residents</h1>
-          <p className="text-muted-foreground text-sm mt-1">{total} total residents</p>
+          <p className="text-muted-foreground text-sm mt-1">{total} {statusFilter === "active" ? "active" : statusFilter === "inactive" ? "former" : "total"} residents</p>
         </div>
         <Button onClick={openAdd} className="gap-2 bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4" /> Add Resident
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9 h-9 bg-muted/50 border-border/60"
-          placeholder="Search name, phone, email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Search + Filter */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9 h-9 bg-muted/50 border-border/60"
+            placeholder="Search name, phone, email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {/* Status filter dropdown */}
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+          <SelectTrigger className="h-9 w-36 bg-muted/50 border-border/60">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Former</SelectItem>
+            <SelectItem value="all">All residents</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -166,11 +241,7 @@ export default function ResidentsPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                </TableCell>
-              </TableRow>
+              <TableRowSkeleton cols={6} rows={7} />
             ) : residents.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
@@ -224,6 +295,11 @@ export default function ResidentsPage() {
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(r)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      {r.is_active && (
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-amber-600" title="Check out" onClick={() => openCheckout(r)}>
+                          <LogOut className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(r)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -260,13 +336,27 @@ export default function ResidentsPage() {
           <div className="space-y-3 py-2">
             {(["name", "phone", "email", "id_number"] as const).map((field) => (
               <div key={field} className="space-y-1">
-                <Label htmlFor={field} className="capitalize">{field.replace("_", " ")}{field === "name" && " *"}</Label>
+                <Label htmlFor={field} className="capitalize">
+                  {field.replace("_", " ")}
+                  {(field === "name" || field === "phone") && <span className="text-destructive ml-0.5">*</span>}
+                </Label>
                 <Input
                   id={field}
                   value={form[field]}
-                  onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
-                  placeholder={field === "name" ? "Full name" : field === "id_number" ? "National ID / Passport" : ""}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, [field]: e.target.value }));
+                    if (field === "phone") setPhoneError("");
+                  }}
+                  placeholder={
+                    field === "name" ? "Full name" :
+                    field === "phone" ? "10-digit mobile number" :
+                    field === "id_number" ? "National ID / Passport" : ""
+                  }
+                  className={field === "phone" && phoneError ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {field === "phone" && phoneError && (
+                  <p className="text-xs text-destructive">{phoneError}</p>
+                )}
               </div>
             ))}
             <div className="space-y-1">
@@ -279,12 +369,11 @@ export default function ResidentsPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="move_in_date">Move-in Date</Label>
-              <Input
-                id="move_in_date"
-                type="date"
+              <Label>Move-in Date</Label>
+              <DatePicker
                 value={form.move_in_date}
-                onChange={(e) => setForm((p) => ({ ...p, move_in_date: e.target.value }))}
+                onChange={(v) => setForm((p) => ({ ...p, move_in_date: v }))}
+                placeholder="Select move-in date"
               />
             </div>
           </div>
@@ -293,6 +382,34 @@ export default function ResidentsPage() {
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing ? "Save Changes" : "Add Resident"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Checkout Confirmation Dialog */}
+      <Dialog open={!!checkoutResident} onOpenChange={(open) => { if (!open) setCheckoutResident(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Check Out Resident</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              This will mark <span className="font-medium text-foreground">{checkoutResident?.name}</span> as inactive and vacate their bed.
+            </p>
+            <div className="space-y-1">
+              <Label>Move-out Date</Label>
+              <DatePicker
+                value={checkoutDate}
+                onChange={setCheckoutDate}
+                placeholder="Select move-out date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckoutResident(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleCheckout} disabled={checkingOut || !checkoutDate}>
+              {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Checkout
             </Button>
           </DialogFooter>
         </DialogContent>

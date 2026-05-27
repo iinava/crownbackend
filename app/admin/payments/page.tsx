@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import MonthPicker from "@/components/MonthPicker";
 import { useHostel } from "@/lib/hostel-context";
+import { TableRowSkeleton } from "@/components/skeletons";
 import { Input } from "@/components/ui/input";
 
 interface Payment {
@@ -317,11 +318,7 @@ function PaymentsInner() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                </TableCell>
-              </TableRow>
+              <TableRowSkeleton cols={7} rows={8} />
             ) : payments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12">
@@ -424,7 +421,7 @@ function PaymentsInner() {
 
                     <TableCell className="text-sm text-muted-foreground">
                       {p.due_date
-                        ? new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                        ? new Date(p.due_date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
                         : "—"}
                     </TableCell>
 
@@ -434,7 +431,7 @@ function PaymentsInner() {
                           <CheckCircle2 className="h-3 w-3" /> Paid
                           {p.paid_at && (
                             <span className="text-success/60 ml-0.5">
-                              {new Date(p.paid_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                              {new Date(p.paid_at).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}
                             </span>
                           )}
                         </span>

@@ -88,7 +88,13 @@ export default async function ResidentDetailPage({
             {resident.move_in_date && (
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span>Moved in {new Date(resident.move_in_date).toLocaleDateString()}</span>
+                <span>Moved in {new Date(resident.move_in_date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
+              </div>
+            )}
+            {resident.move_out_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground">Checked out {new Date(resident.move_out_date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
               </div>
             )}
           </CardContent>
@@ -106,11 +112,11 @@ export default async function ResidentDetailPage({
               <div key={p.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {new Date(p.month).toLocaleString("default", { month: "long", year: "numeric" })}
+                    {new Date(p.month).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })}
                   </p>
                   {p.paid_at && (
                     <p className="text-xs text-muted-foreground">
-                      Paid on {new Date(p.paid_at).toLocaleDateString()}
+                      Paid on {new Date(p.paid_at).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}
                     </p>
                   )}
                 </div>

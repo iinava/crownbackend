@@ -33,6 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowSkeleton } from "@/components/skeletons";
 
 interface AdminUser {
   id: number;
@@ -188,9 +189,9 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <table className="w-full">
+              <tbody><TableRowSkeleton cols={3} rows={5} /></tbody>
+            </table>
           ) : (
             <Table>
               <TableHeader>
@@ -213,8 +214,8 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(user.created_at).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
+                        day: "2-digit",
+                        month: "2-digit",
                         year: "numeric",
                       })}
                     </TableCell>

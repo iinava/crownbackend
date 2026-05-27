@@ -6,6 +6,7 @@ import {
 } from "@/lib/dal/notifications";
 import { sendReminder, normalizePhone } from "@/lib/sms";
 import { isAuthenticated } from "@/lib/auth";
+import { getSettings } from "@/lib/dal/settings";
 import { NextRequest } from "next/server";
 
 // Max calls per cron invocation (matches Vobiz concurrent limit)
@@ -37,10 +38,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Step 1: Recalculate fines
+    // Step 1: Recalculate fines (always runs, regardless of voice setting)
     const finesUpdated = await recalculateFines();
 
-    // Step 2: Get overdue residents with phone numbers
+    // Step 2: Check if voice reminders are enabled
+    const { voice_reminders_enabled } = await getSettings();
+    if (!voice_reminders_enabled) {
+      return Response.json({
+        success: true,
+        finesUpdated,
+        voiceRemindersDisabled: true,
+        message: "Voice reminders are disabled in settings. Fines were still recalculated.",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Step 3: Get overdue residents with phone numbers
     const overdueResidents = await getOverdueResidents();
 
     let sent = 0;

@@ -11,6 +11,7 @@ export interface Resident {
   move_in_date: string | null;
   notes: string | null;
   is_active: boolean;
+  move_out_date: string | null;
   created_at: string;
   updated_at: string;
   bed_number?: string | null;
@@ -30,6 +31,7 @@ export interface ResidentListParams {
   limit?: number;
   offset?: number;
   activeOnly?: boolean;
+  inactiveOnly?: boolean;
   hostelId?: number;
 }
 
@@ -37,7 +39,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
   data: Resident[];
   total: number;
 }> {
-  const { search = "", limit = 20, offset = 0, activeOnly = false, hostelId } = params;
+  const { search = "", limit = 20, offset = 0, activeOnly = false, inactiveOnly = false, hostelId } = params;
   const searchPattern = `%${search}%`;
 
   const data = await sql`
@@ -69,6 +71,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
     WHERE 
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
+      AND (${inactiveOnly} = false OR r.is_active = false)
       AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
     ORDER BY r.name
     LIMIT ${limit} OFFSET ${offset}
@@ -83,6 +86,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
     WHERE 
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
+      AND (${inactiveOnly} = false OR r.is_active = false)
       AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
   `;
 
@@ -131,6 +135,7 @@ export async function createResident(data: CreateResidentData): Promise<Resident
 
 export interface UpdateResidentData extends Partial<CreateResidentData> {
   is_active?: boolean;
+  move_out_date?: string | null;
 }
 
 export async function updateResident(id: number, data: UpdateResidentData): Promise<Resident | null> {
@@ -145,11 +150,58 @@ export async function updateResident(id: number, data: UpdateResidentData): Prom
       move_in_date = CASE WHEN ${data.move_in_date !== undefined} THEN ${data.move_in_date || null} ELSE move_in_date END,
       notes       = CASE WHEN ${data.notes !== undefined} THEN ${data.notes || null} ELSE notes END,
       is_active   = CASE WHEN ${data.is_active !== undefined} THEN ${data.is_active ?? null} ELSE is_active END,
+      move_out_date = CASE WHEN ${data.move_out_date !== undefined} THEN ${data.move_out_date || null} ELSE move_out_date END,
       updated_at  = NOW()
     WHERE id = ${id}
     RETURNING *
   `;
   return (rows[0] as Resident) ?? null;
+}
+
+/**
+ * Check out a resident:
+ * 1. Sets is_active = false and move_out_date on the resident record
+ * 2. Vacates all their active bed assignments
+ * 3. Syncs is_full for affected rooms
+ */
+export async function checkoutResident(
+  id: number,
+  moveOutDate: string
+): Promise<Resident | null> {
+  // 1. Mark resident inactive + set move_out_date
+  const rows = await sql`
+    UPDATE residents
+    SET is_active = false, move_out_date = ${moveOutDate}::date, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  if (rows.length === 0) return null;
+
+  // 2. Find active bed assignments
+  const assignments = await sql`
+    SELECT b.room_id, ba.bed_id FROM bed_assignments ba
+    JOIN beds b ON b.id = ba.bed_id
+    WHERE ba.resident_id = ${id} AND ba.vacated_at IS NULL
+  `;
+  const roomIds = [...new Set((assignments as { room_id: number }[]).map((a) => a.room_id))];
+
+  // 3. Vacate all active bed assignments
+  const vacated = await sql`
+    UPDATE bed_assignments SET vacated_at = NOW()
+    WHERE resident_id = ${id} AND vacated_at IS NULL
+    RETURNING bed_id
+  `;
+  if (vacated.length > 0) {
+    const bedIds = (vacated as { bed_id: number }[]).map((r) => r.bed_id);
+    await sql`UPDATE beds SET is_occupied = false WHERE id = ANY(${bedIds})`;
+  }
+
+  // 4. Sync is_full for affected rooms
+  for (const roomId of roomIds) {
+    await syncRoomFullStatus(roomId);
+  }
+
+  return rows[0] as Resident;
 }
 
 export async function deleteResident(id: number): Promise<void> {

@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { BedDouble, Users, DoorOpen, TrendingDown, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { DashboardSkeleton } from "@/components/skeletons";
 
 interface Room {
   id: number;
@@ -65,16 +66,7 @@ export default function AdminDashboard() {
   };
 
   if (loading || hostelLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div><div className="h-7 w-40 rounded bg-muted" /><div className="h-4 w-64 rounded bg-muted/60 mt-2" /></div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-4 space-y-3"><div className="h-3 w-16 rounded bg-muted" /><div className="h-6 w-12 rounded bg-muted" /></CardContent></Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
