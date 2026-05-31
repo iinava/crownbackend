@@ -25,11 +25,14 @@ export default function RoomsPage() {
 
   useEffect(() => {
     if (hostelLoading) return;
+    const controller = new AbortController();
     setLoading(true);
     const url = hostelParam ? `/api/rooms?hostel=${hostelParam}` : `/api/rooms`;
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then((r) => r.json())
-      .then((data) => { setRooms(data); setLoading(false); });
+      .then((data) => { setRooms(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch((err) => { if (err.name !== "AbortError") { console.error(err); setLoading(false); } });
+    return () => controller.abort();
   }, [hostelParam, hostelLoading]);
 
   if (loading || hostelLoading) {

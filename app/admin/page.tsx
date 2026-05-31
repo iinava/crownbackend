@@ -32,19 +32,29 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (hostelLoading) return;
+    const controller = new AbortController();
+    const { signal } = controller;
     setLoading(true);
     const hq = hostelParam ? `&hostel=${hostelParam}` : "";
 
     Promise.all([
-      fetch(`/api/rooms?_=1${hq}`).then((r) => r.json()),
-      fetch(`/api/payments?paid=false&month=${new Date().toISOString().slice(0, 7) + "-01"}${hq}`).then((r) => r.json()),
-      fetch(`/api/residents?active_only=true&limit=1${hq}`).then((r) => r.json()),
-    ]).then(([roomData, payData, resData]) => {
-      setRooms(roomData);
-      setUnpaid(payData.data ?? []);
-      setTotalResidents(resData.total ?? 0);
-      setLoading(false);
-    });
+      fetch(`/api/rooms?_=1${hq}`, { signal }).then((r) => r.json()),
+      fetch(`/api/payments?paid=false&month=${new Date().toISOString().slice(0, 7) + "-01"}${hq}`, { signal }).then((r) => r.json()),
+      fetch(`/api/residents?active_only=true&limit=1${hq}`, { signal }).then((r) => r.json()),
+    ])
+      .then(([roomData, payData, resData]) => {
+        setRooms(Array.isArray(roomData) ? roomData : []);
+        setUnpaid(payData.data ?? []);
+        setTotalResidents(resData.total ?? 0);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return; // navigated away — ignore
+        console.error("Dashboard fetch failed:", err);
+        setLoading(false); // don't leave stuck on skeleton
+      });
+
+    return () => controller.abort();
   }, [hostelParam, hostelLoading]);
 
   const totalBeds = rooms.reduce((a, r) => a + r.capacity, 0);

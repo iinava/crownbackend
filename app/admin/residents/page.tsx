@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, Users, CheckCircle2, Clock, BedDouble, LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +58,8 @@ export default function ResidentsPage() {
   const [checkoutResident, setCheckoutResident] = useState<Resident | null>(null);
   const [checkoutDate, setCheckoutDate] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Resident | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { hostelParam, isLoading: hostelLoading } = useHostel();
 
   const [form, setForm] = useState({
@@ -65,7 +67,7 @@ export default function ResidentsPage() {
     monthly_rate: "", daily_rate: "", move_in_date: "", notes: "",
   });
 
-  const fetchResidents = useCallback(async () => {
+  const fetchResidents = useCallback(async (signal?: AbortSignal) => {
     if (hostelLoading) return;
     setLoading(true);
     try {
@@ -76,17 +78,26 @@ export default function ResidentsPage() {
         ? "&inactive_only=true"
         : "";
       const res = await fetch(
-        `/api/residents?search=${encodeURIComponent(search)}&limit=${LIMIT}&offset=${offset}${hq}${fq}`
+        `/api/residents?search=${encodeURIComponent(search)}&limit=${LIMIT}&offset=${offset}${hq}${fq}`,
+        { signal }
       );
+      if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
-      setResidents(data.data);
-      setTotal(data.total);
+      setResidents(data.data ?? []);
+      setTotal(data.total ?? 0);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      console.error("Residents fetch failed:", err);
     } finally {
       setLoading(false);
     }
   }, [search, offset, hostelParam, hostelLoading, statusFilter]);
 
-  useEffect(() => { fetchResidents(); }, [fetchResidents]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchResidents(controller.signal);
+    return () => controller.abort();
+  }, [fetchResidents]);
 
   useEffect(() => {
     fetch("/api/settings").then(r => r.json()).then(s => {
@@ -156,13 +167,23 @@ export default function ResidentsPage() {
   }
 
   async function handleDelete(r: Resident) {
-    if (!confirm(`Delete ${r.name}? This will also vacate their bed.`)) return;
-    const res = await fetch(`/api/residents/${r.id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Resident deleted");
-      fetchResidents();
-    } else {
-      toast.error("Failed to delete");
+    setDeleteTarget(r);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/residents/${deleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Resident deleted");
+        setDeleteTarget(null);
+        fetchResidents();
+      } else {
+        toast.error("Failed to delete");
+      }
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -434,6 +455,24 @@ export default function ResidentsPage() {
             <Button variant="destructive" onClick={handleCheckout} disabled={checkingOut || !checkoutDate}>
               {checkingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Checkout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Resident</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <span className="font-medium text-foreground">{deleteTarget?.name}</span> and vacate their bed. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

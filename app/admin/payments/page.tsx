@@ -71,21 +71,30 @@ function PaymentsInner() {
   const [editValue, setEditValue] = useState("");
   const { hostelParam, isLoading: hostelLoading } = useHostel();
 
-  const fetchPayments = useCallback(async () => {
+  const fetchPayments = useCallback(async (signal?: AbortSignal) => {
     if (hostelLoading) return;
     setLoading(true);
     try {
       const hq  = hostelParam ? `&hostel=${hostelParam}` : "";
-      const res = await fetch(`/api/payments?month=${month}-01&limit=200${hq}`);
+      const res = await fetch(`/api/payments?month=${month}-01&limit=200${hq}`, { signal });
+      if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setPayments(data.data ?? []);
       setTotal(data.total ?? 0);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      console.error("Payments fetch failed:", err);
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, hostelParam, hostelLoading]);
 
-  useEffect(() => { fetchPayments(); }, [fetchPayments]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchPayments(controller.signal);
+    return () => controller.abort();
+  }, [fetchPayments]);
 
   async function generatePayments() {
     setGenerating(true);

@@ -77,6 +77,9 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       AND (${inactiveOnly} = false OR r.is_active = false)
       AND (
         ${hostelId ?? null}::int IS NULL
+        -- Unassigned residents: always show regardless of hostel filter
+        OR NOT EXISTS (SELECT 1 FROM bed_assignments ba_chk WHERE ba_chk.resident_id = r.id)
+        -- Assigned residents: only show if they're in the selected hostel
         OR EXISTS (
           SELECT 1
           FROM bed_assignments ba2
@@ -99,6 +102,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       AND (${inactiveOnly} = false OR r.is_active = false)
       AND (
         ${hostelId ?? null}::int IS NULL
+        OR NOT EXISTS (SELECT 1 FROM bed_assignments ba_chk WHERE ba_chk.resident_id = r.id)
         OR EXISTS (
           SELECT 1
           FROM bed_assignments ba2
