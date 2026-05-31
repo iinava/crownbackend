@@ -16,6 +16,7 @@ interface Room {
   occupied_count: number;
   floor_label: string;
   room_type: string;
+  hostel_name?: string;
 }
 
 interface Unpaid {
@@ -142,39 +143,103 @@ export default function AdminDashboard() {
       </Card>
 
       {/* Rooms at a glance */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium">Rooms at a glance</h2>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold">Rooms at a glance</h2>
           <Link href="/admin/rooms" className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline">
-            Manage rooms
+            Manage rooms →
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {rooms.map((room) => {
-            const pct = Math.round((room.occupied_count / room.capacity) * 100);
-            const isFull = room.occupied_count >= room.capacity;
-            return (
-              <Link key={room.id} href={`/admin/rooms/${room.id}`}>
-                <Card className="cursor-pointer hover:bg-accent transition-colors">
-                  <CardContent className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <p className="font-medium text-sm">{room.number}</p>
-                      {roomTypeBadge(room.room_type)}
+        {(() => {
+          const byGroup = rooms.reduce<Record<string, Room[]>>((acc, room) => {
+            const key = hostelParam
+              ? (room.floor_label ?? "Other")
+              : `${room.hostel_name ?? ""} · ${room.floor_label ?? "Other"}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(room);
+            return acc;
+          }, {});
+
+          const floorNumber = (label: string) => {
+            const m = label.match(/(\d+)/);
+            return m ? parseInt(m[1], 10) : 999;
+          };
+          const sortedGroups = Object.entries(byGroup).sort(([a], [b]) => {
+            const [aHostel = "", aFloor = a] = a.split(" · ");
+            const [bHostel = "", bFloor = b] = b.split(" · ");
+            const hostelCmp = aHostel.localeCompare(bHostel);
+            if (hostelCmp !== 0) return hostelCmp;
+            return floorNumber(aFloor) - floorNumber(bFloor);
+          });
+
+          return (
+            <div className="space-y-5">
+              {sortedGroups.map(([groupLabel, groupRooms]) => {
+                const grpOcc = groupRooms.reduce((a, r) => a + r.occupied_count, 0);
+                const grpCap = groupRooms.reduce((a, r) => a + r.capacity, 0);
+                return (
+                  <div key={groupLabel}>
+                    {/* Group header */}
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                        {groupLabel}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {grpOcc}/{grpCap}
+                      </span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{room.floor_label}</p>
-                    <Progress value={pct} className="h-1 mt-2" />
-                    <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
-                      {room.occupied_count}/{room.capacity}
-                    </p>
-                    {isFull && (
-                      <span className="text-[10px] font-medium text-destructive">Full</span>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+
+                    {/* Room cards grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                      {groupRooms.map((room) => {
+                        const pct = room.capacity > 0 ? Math.round((room.occupied_count / room.capacity) * 100) : 0;
+                        const isFull = room.occupied_count >= room.capacity;
+                        const hasOccupants = room.occupied_count > 0;
+                        const dotColor = isFull
+                          ? "bg-destructive"
+                          : hasOccupants ? "bg-success" : "bg-muted-foreground/25";
+                        const barColor = isFull
+                          ? "bg-destructive"
+                          : hasOccupants ? "bg-success" : "bg-muted-foreground/20";
+                        return (
+                          <Link key={room.id} href={`/admin/rooms/${room.id}`}>
+                            <Card className="cursor-pointer hover:bg-accent hover:shadow-sm transition-all duration-150 border-border/60">
+                              <CardContent className="p-3">
+                                {/* Top row: icon + name + badge */}
+                                <div className="flex items-start justify-between gap-1 mb-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <BedDouble className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <span className="text-sm font-semibold truncate">{room.number}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {roomTypeBadge(room.room_type)}
+                                    <span className={`h-1.5 w-1.5 rounded-full ${dotColor} shrink-0`} />
+                                  </div>
+                                </div>
+                                {/* Progress bar */}
+                                <div className="w-full bg-muted rounded-full h-1 overflow-hidden mb-1.5">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                {/* Bottom: ratio */}
+                                <p className="text-[10px] text-muted-foreground tabular-nums">
+                                  {room.occupied_count}/{room.capacity} beds
+                                </p>
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

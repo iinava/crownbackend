@@ -4,7 +4,7 @@ export interface Payment {
   id: number;
   resident_id: number;
   amount: string;          // rent amount (from resident's monthly_rate)
-  due_date: string | null; // 5th of the payment month
+  due_date: string | null; // 5th of the payment month (null for dorm residents)
   fine_amount: string;     // accrued daily fine
   month: string;
   paid: boolean;
@@ -13,6 +13,7 @@ export interface Payment {
   created_at: string;
   resident_name?: string;
   hostel_name?: string;
+  resident_move_in_date?: string | null;
   // Computed helpers
   total_due?: number;      // amount + fine_amount
   days_overdue?: number;
@@ -33,22 +34,47 @@ export async function getPayments(filters: {
     SELECT 
       p.*,
       r.name AS resident_name,
-      h.name AS hostel_name,
+      r.move_in_date AS resident_move_in_date,
+      -- Hostel name: prefer active assignment, fall back to most recent historical one
+      COALESCE(
+        h_active.name,
+        (
+          SELECT h2.name FROM bed_assignments ba2
+          JOIN beds b2 ON b2.id = ba2.bed_id
+          JOIN rooms rm2 ON rm2.id = b2.room_id
+          JOIN floors fl2 ON fl2.id = rm2.floor_id
+          JOIN hostels h2 ON h2.id = fl2.hostel_id
+          WHERE ba2.resident_id = r.id
+          ORDER BY ba2.vacated_at DESC NULLS FIRST
+          LIMIT 1
+        )
+      ) AS hostel_name,
       (p.amount + p.fine_amount)::numeric                                                    AS total_due,
       GREATEST(0, (NOW() AT TIME ZONE 'Asia/Kolkata')::date - p.due_date::date)::int         AS days_overdue,
       (p.due_date IS NOT NULL AND (NOW() AT TIME ZONE 'Asia/Kolkata')::date > p.due_date::date AND p.paid = false) AS is_expired
     FROM payments p
     JOIN residents r ON r.id = p.resident_id
+    -- Active bed (may be NULL for checked-out residents)
     LEFT JOIN bed_assignments ba ON ba.resident_id = r.id AND ba.vacated_at IS NULL
     LEFT JOIN beds b ON b.id = ba.bed_id
     LEFT JOIN rooms rm ON rm.id = b.room_id
     LEFT JOIN floors fl ON fl.id = rm.floor_id
-    LEFT JOIN hostels h ON h.id = fl.hostel_id
+    LEFT JOIN hostels h_active ON h_active.id = fl.hostel_id
     WHERE 
       (${residentId ?? null}::int IS NULL OR p.resident_id = ${residentId ?? null})
       AND (${month ?? null}::text IS NULL OR p.month = ${month ?? null}::date)
       AND (${paid ?? null}::boolean IS NULL OR p.paid = ${paid ?? null})
-      AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
+      AND (
+        ${hostelId ?? null}::int IS NULL
+        OR EXISTS (
+          SELECT 1 FROM bed_assignments ba2
+          JOIN beds b2 ON b2.id = ba2.bed_id
+          JOIN rooms rm2 ON rm2.id = b2.room_id
+          JOIN floors fl2 ON fl2.id = rm2.floor_id
+          WHERE ba2.resident_id = r.id
+            AND fl2.hostel_id = ${hostelId ?? null}
+        )
+      )
     ORDER BY p.paid ASC, r.name
     LIMIT ${limit} OFFSET ${offset}
   `;
@@ -56,15 +82,21 @@ export async function getPayments(filters: {
   const countRow = await sql`
     SELECT COUNT(*)::int AS total FROM payments p
     JOIN residents r ON r.id = p.resident_id
-    LEFT JOIN bed_assignments ba ON ba.resident_id = r.id AND ba.vacated_at IS NULL
-    LEFT JOIN beds b ON b.id = ba.bed_id
-    LEFT JOIN rooms rm ON rm.id = b.room_id
-    LEFT JOIN floors fl ON fl.id = rm.floor_id
     WHERE 
       (${residentId ?? null}::int IS NULL OR p.resident_id = ${residentId ?? null})
       AND (${month ?? null}::text IS NULL OR p.month = ${month ?? null}::date)
       AND (${paid ?? null}::boolean IS NULL OR p.paid = ${paid ?? null})
-      AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
+      AND (
+        ${hostelId ?? null}::int IS NULL
+        OR EXISTS (
+          SELECT 1 FROM bed_assignments ba2
+          JOIN beds b2 ON b2.id = ba2.bed_id
+          JOIN rooms rm2 ON rm2.id = b2.room_id
+          JOIN floors fl2 ON fl2.id = rm2.floor_id
+          WHERE ba2.resident_id = r.id
+            AND fl2.hostel_id = ${hostelId ?? null}
+        )
+      )
   `;
 
   return { data: data as Payment[], total: countRow[0].total };
@@ -121,6 +153,7 @@ export async function updatePaymentFields(
  * Recalculate fines for ALL unpaid overdue payments.
  * Fine starts after the 5th of each month.
  * fine_amount = MAX(0, days_past_due_date) * daily_fine_amount setting
+ * Dormitory residents never accrue fines.
  */
 export async function recalculateFines(): Promise<number> {
   const result = await sql`
@@ -130,6 +163,16 @@ export async function recalculateFines(): Promise<number> {
     WHERE p.paid = false
       AND p.due_date IS NOT NULL
       AND (NOW() AT TIME ZONE 'Asia/Kolkata')::date > p.due_date::date
+      -- Skip dormitory residents
+      AND NOT EXISTS (
+        SELECT 1
+        FROM bed_assignments ba
+        JOIN beds b ON b.id = ba.bed_id
+        JOIN rooms rm ON rm.id = b.room_id
+        WHERE ba.resident_id = p.resident_id
+          AND ba.vacated_at IS NULL
+          AND rm.room_type = 'dormitory'
+      )
     RETURNING id
   `;
   return result.length;
@@ -137,18 +180,37 @@ export async function recalculateFines(): Promise<number> {
 
 /**
  * Generate monthly payment rows for all active residents with a bed.
- * Uses each resident's individual monthly_rate.
- * Due date = 5th of the payment month (fines start from 6th).
+ *
+ * Normal rooms:   amount = monthly_rate, due_date = 5th of month
+ * Dormitory rooms: amount = daily_rate × days stayed in that billing month,
+ *                  due_date = NULL (pay on checkout, no fines)
+ *
  * Idempotent — uses ON CONFLICT DO NOTHING.
  */
 export async function generateMonthlyPayments(month: string, hostelId?: number): Promise<number> {
   const result = await sql`
     INSERT INTO payments (resident_id, month, amount, due_date)
-    SELECT 
+    SELECT
       r.id,
       ${month}::date,
-      r.monthly_rate,
-      (${month}::date + INTERVAL '4 days')::date
+      CASE
+        WHEN rm.room_type = 'dormitory' THEN
+          -- days from MAX(start_of_month, move_in_date) to end_of_month (inclusive)
+          r.daily_rate * GREATEST(0,
+            (DATE_TRUNC('month', ${month}::date) + INTERVAL '1 month - 1 day')::date
+            - GREATEST(
+                DATE_TRUNC('month', ${month}::date)::date,
+                COALESCE(r.move_in_date, DATE_TRUNC('month', ${month}::date)::date)
+              )
+            + 1
+          )
+        ELSE
+          r.monthly_rate
+      END AS amount,
+      CASE
+        WHEN rm.room_type = 'dormitory' THEN NULL
+        ELSE (${month}::date + INTERVAL '4 days')::date
+      END AS due_date
     FROM residents r
     JOIN bed_assignments ba ON ba.resident_id = r.id AND ba.vacated_at IS NULL
     JOIN beds b ON b.id = ba.bed_id

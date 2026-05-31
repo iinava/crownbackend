@@ -8,6 +8,7 @@ export interface Resident {
   email: string | null;
   id_number: string | null;
   monthly_rate: string;
+  daily_rate: string;
   move_in_date: string | null;
   notes: string | null;
   is_active: boolean;
@@ -20,6 +21,7 @@ export interface Resident {
   bed_id?: number | null;
   hostel_name?: string | null;
   hostel_id?: number | null;
+  room_type?: string | null;
   /** true = has an unpaid payment row this month; false = paid OR no row yet */
   has_unpaid?: boolean;
   /** true = a payment row exists for this month */
@@ -48,6 +50,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       b.number AS bed_number,
       rm.number AS room_number,
       rm.id AS room_id,
+      rm.room_type AS room_type,
       b.id AS bed_id,
       h.name AS hostel_name,
       h.id AS hostel_id,
@@ -72,22 +75,40 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
       AND (${inactiveOnly} = false OR r.is_active = false)
-      AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
+      AND (
+        ${hostelId ?? null}::int IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM bed_assignments ba2
+          JOIN beds b2 ON b2.id = ba2.bed_id
+          JOIN rooms rm2 ON rm2.id = b2.room_id
+          JOIN floors fl2 ON fl2.id = rm2.floor_id
+          WHERE ba2.resident_id = r.id
+            AND fl2.hostel_id = ${hostelId ?? null}
+        )
+      )
     ORDER BY r.name
     LIMIT ${limit} OFFSET ${offset}
   `;
 
   const countRow = await sql`
     SELECT COUNT(*)::int AS total FROM residents r
-    LEFT JOIN bed_assignments ba ON ba.resident_id = r.id AND ba.vacated_at IS NULL
-    LEFT JOIN beds b ON b.id = ba.bed_id
-    LEFT JOIN rooms rm ON rm.id = b.room_id
-    LEFT JOIN floors fl ON fl.id = rm.floor_id
     WHERE 
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
       AND (${inactiveOnly} = false OR r.is_active = false)
-      AND (${hostelId ?? null}::int IS NULL OR fl.hostel_id = ${hostelId ?? null})
+      AND (
+        ${hostelId ?? null}::int IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM bed_assignments ba2
+          JOIN beds b2 ON b2.id = ba2.bed_id
+          JOIN rooms rm2 ON rm2.id = b2.room_id
+          JOIN floors fl2 ON fl2.id = rm2.floor_id
+          WHERE ba2.resident_id = r.id
+            AND fl2.hostel_id = ${hostelId ?? null}
+        )
+      )
   `;
 
   return { data: data as Resident[], total: countRow[0].total };
@@ -101,6 +122,7 @@ export async function getResidentById(id: number): Promise<Resident | null> {
       rm.number AS room_number,
       b.id AS bed_id,
       rm.id AS room_id,
+      rm.room_type AS room_type,
       h.name AS hostel_name,
       h.id AS hostel_id
     FROM residents r
@@ -120,14 +142,15 @@ export interface CreateResidentData {
   email?: string;
   id_number?: string;
   monthly_rate: number;
+  daily_rate?: number;
   move_in_date?: string;
   notes?: string;
 }
 
 export async function createResident(data: CreateResidentData): Promise<Resident> {
   const rows = await sql`
-    INSERT INTO residents (name, phone, email, id_number, monthly_rate, move_in_date, notes)
-    VALUES (${data.name}, ${data.phone || null}, ${data.email || null}, ${data.id_number || null}, ${data.monthly_rate}, ${data.move_in_date || null}, ${data.notes || null})
+    INSERT INTO residents (name, phone, email, id_number, monthly_rate, daily_rate, move_in_date, notes)
+    VALUES (${data.name}, ${data.phone || null}, ${data.email || null}, ${data.id_number || null}, ${data.monthly_rate}, ${data.daily_rate ?? 0}, ${data.move_in_date || null}, ${data.notes || null})
     RETURNING *
   `;
   return rows[0] as Resident;
@@ -136,6 +159,7 @@ export async function createResident(data: CreateResidentData): Promise<Resident
 export interface UpdateResidentData extends Partial<CreateResidentData> {
   is_active?: boolean;
   move_out_date?: string | null;
+  daily_rate?: number;
 }
 
 export async function updateResident(id: number, data: UpdateResidentData): Promise<Resident | null> {
@@ -147,6 +171,7 @@ export async function updateResident(id: number, data: UpdateResidentData): Prom
       email       = CASE WHEN ${data.email !== undefined} THEN ${data.email || null} ELSE email END,
       id_number   = CASE WHEN ${data.id_number !== undefined} THEN ${data.id_number || null} ELSE id_number END,
       monthly_rate = CASE WHEN ${data.monthly_rate !== undefined} THEN ${data.monthly_rate ?? null} ELSE monthly_rate END,
+      daily_rate  = CASE WHEN ${data.daily_rate !== undefined} THEN ${data.daily_rate ?? 0} ELSE daily_rate END,
       move_in_date = CASE WHEN ${data.move_in_date !== undefined} THEN ${data.move_in_date || null} ELSE move_in_date END,
       notes       = CASE WHEN ${data.notes !== undefined} THEN ${data.notes || null} ELSE notes END,
       is_active   = CASE WHEN ${data.is_active !== undefined} THEN ${data.is_active ?? null} ELSE is_active END,

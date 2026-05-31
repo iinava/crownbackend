@@ -53,16 +53,16 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
       .finally(() => setLoadingResidents(false));
   }, [open]);
 
-  // Client-side filter
-  const results = search.trim().length === 0
-    ? allResidents
-    : allResidents.filter((r) => {
-        const q = search.toLowerCase();
-        return (
-          r.name.toLowerCase().includes(q) ||
-          (r.phone ?? "").toLowerCase().includes(q)
-        );
-      });
+  // Client-side filter — only unassigned residents, matching search
+  const results = allResidents.filter((r) => {
+    if (r.bed_number) return false; // already assigned elsewhere
+    if (search.trim().length === 0) return true;
+    const q = search.toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      (r.phone ?? "").toLowerCase().includes(q)
+    );
+  });
 
   const handleBedClick = useCallback((bed: Bed) => {
     setSelectedBed(bed);

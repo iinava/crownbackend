@@ -46,6 +46,20 @@ export default function RoomsPage() {
     return acc;
   }, {});
 
+  // Sort groups: by hostel name first, then by floor number
+  const floorNumber = (label: string) => {
+    const m = label.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : 999;
+  };
+  const sortedGroups = Object.entries(byFloor).sort(([a], [b]) => {
+    // Split "Hostel · Floor" into parts for comparison
+    const [aHostel = "", aFloor = a] = a.split(" · ");
+    const [bHostel = "", bFloor = b] = b.split(" · ");
+    const hostelCmp = aHostel.localeCompare(bHostel);
+    if (hostelCmp !== 0) return hostelCmp;
+    return floorNumber(aFloor) - floorNumber(bFloor);
+  });
+
   const totalBeds = rooms.reduce((a, r) => a + r.capacity, 0);
   const totalOcc = rooms.reduce((a, r) => a + r.occupied_count, 0);
 
@@ -66,7 +80,7 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {Object.entries(byFloor).map(([floorLabel, floorRooms]) => {
+      {sortedGroups.map(([floorLabel, floorRooms]) => {
         const floorOcc = floorRooms.reduce((a, r) => a + r.occupied_count, 0);
         const floorCap = floorRooms.reduce((a, r) => a + r.capacity, 0);
         const floorPct = Math.round((floorOcc / floorCap) * 100);

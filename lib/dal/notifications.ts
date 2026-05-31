@@ -36,7 +36,10 @@ export async function getOverdueResidents(hostelId?: number): Promise<OverdueRes
     LEFT JOIN rooms rm ON rm.id = b.room_id
     LEFT JOIN floors fl ON fl.id = rm.floor_id
     WHERE p.paid = false
-      AND p.due_date < NOW()
+      AND (
+        (EXTRACT(DAY FROM NOW() AT TIME ZONE 'Asia/Kolkata') >= 3 AND p.month = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')::date)
+        OR p.due_date < NOW()
+      )
       AND r.phone IS NOT NULL
       AND r.phone != ''
       AND r.is_active = true

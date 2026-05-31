@@ -30,10 +30,12 @@ interface Resident {
   email: string | null;
   id_number: string | null;
   monthly_rate: string;
+  daily_rate: string;
   move_in_date: string | null;
   is_active: boolean;
   bed_number: string | null;
   room_number: string | null;
+  room_type: string | null;
   has_unpaid: boolean;
   has_payment: boolean;
   move_out_date: string | null;
@@ -60,7 +62,7 @@ export default function ResidentsPage() {
 
   const [form, setForm] = useState({
     name: "", phone: "", email: "", id_number: "",
-    monthly_rate: "", move_in_date: "", notes: "",
+    monthly_rate: "", daily_rate: "", move_in_date: "", notes: "",
   });
 
   const fetchResidents = useCallback(async () => {
@@ -97,7 +99,7 @@ export default function ResidentsPage() {
   function openAdd() {
     setEditing(null);
     setPhoneError("");
-    setForm({ name: "", phone: "", email: "", id_number: "", monthly_rate: defaultRate, move_in_date: "", notes: "" });
+    setForm({ name: "", phone: "", email: "", id_number: "", monthly_rate: defaultRate, daily_rate: "", move_in_date: "", notes: "" });
     setDialogOpen(true);
   }
 
@@ -107,6 +109,7 @@ export default function ResidentsPage() {
     setForm({
       name: r.name, phone: r.phone ?? "", email: r.email ?? "",
       id_number: r.id_number ?? "", monthly_rate: r.monthly_rate,
+      daily_rate: r.daily_rate ?? "",
       move_in_date: r.move_in_date?.slice(0, 10) ?? "", notes: "",
     });
     setDialogOpen(true);
@@ -127,7 +130,11 @@ export default function ResidentsPage() {
     setPhoneError("");
     setSaving(true);
     try {
-      const payload = { ...form, monthly_rate: Number(form.monthly_rate) || 0 };
+      const payload = {
+        ...form,
+        monthly_rate: Number(form.monthly_rate) || 0,
+        daily_rate: Number(form.daily_rate) || 0,
+      };
       const url = editing ? `/api/residents/${editing.id}` : "/api/residents";
       const method = editing ? "PATCH" : "POST";
       const res = await fetch(url, {
@@ -275,7 +282,14 @@ export default function ResidentsPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-sm font-medium">
-                    ₹{Number(r.monthly_rate).toLocaleString("en-IN")}
+                    {Number(r.daily_rate) > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        ₹{Number(r.daily_rate).toLocaleString("en-IN")}
+                        <span className="text-[10px] text-muted-foreground font-normal">/day</span>
+                      </span>
+                    ) : (
+                      <span>₹{Number(r.monthly_rate).toLocaleString("en-IN")}</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {r.has_unpaid ? (
@@ -360,12 +374,22 @@ export default function ResidentsPage() {
               </div>
             ))}
             <div className="space-y-1">
-              <Label htmlFor="monthly_rate">Monthly Rate (₹)</Label>
+              <Label htmlFor="monthly_rate">Monthly Rate (₹) <span className="text-muted-foreground text-xs font-normal">— for normal rooms</span></Label>
               <Input
                 id="monthly_rate"
                 type="number"
                 value={form.monthly_rate}
                 onChange={(e) => setForm((p) => ({ ...p, monthly_rate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="daily_rate">Daily Rate (₹) <span className="text-muted-foreground text-xs font-normal">— for dormitory rooms</span></Label>
+              <Input
+                id="daily_rate"
+                type="number"
+                value={form.daily_rate}
+                onChange={(e) => setForm((p) => ({ ...p, daily_rate: e.target.value }))}
+                placeholder="0 if not a dorm guest"
               />
             </div>
             <div className="space-y-1">
