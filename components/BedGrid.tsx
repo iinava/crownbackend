@@ -152,7 +152,7 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                   )}
                 >
                   <BedDouble className="h-4 w-4 mb-1 shrink-0" />
-                  <span className="font-semibold">{bed.number.split("-")[1]}</span>
+                  <span className="font-semibold text-[11px]">{bed.number.split("-").slice(1).join("-")}</span>
                   {bed.is_occupied && bed.resident_name ? (
                     <span className="truncate w-full text-center text-[10px] leading-tight mt-0.5 text-success/80">
                       {bed.resident_name.split(" ")[0]}

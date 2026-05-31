@@ -49,9 +49,17 @@ function PaymentsInner() {
   const searchParams = useSearchParams();
 
   const monthParam = searchParams.get("month") ?? todayMonthISO();
+  const tabParam = (searchParams.get("tab") ?? "payments") as Tab;
   const [month, setMonthState] = useState(monthParam);
-  const [activeTab, setActiveTab]     = useState<Tab>("payments");
+  const [activeTab, setActiveTabState] = useState<Tab>(tabParam);
   const [expensesTotal, setExpensesTotal] = useState(0);
+
+  function setActiveTab(tab: Tab) {
+    setActiveTabState(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
 
   function setMonth(m: string) {
     setMonthState(m);
@@ -90,11 +98,27 @@ function PaymentsInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, hostelParam, hostelLoading]);
 
+  const fetchExpensesTotal = useCallback(async (signal?: AbortSignal) => {
+    if (hostelLoading) return;
+    try {
+      const hq  = hostelParam ? `&hostel=${hostelParam}` : "";
+      const res = await fetch(`/api/expenses?month=${month}-01&limit=200${hq}`, { signal });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list: Array<{ amount: string }> = data.data ?? [];
+      setExpensesTotal(list.reduce((s, e) => s + Number(e.amount), 0));
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, hostelParam, hostelLoading]);
+
   useEffect(() => {
     const controller = new AbortController();
     fetchPayments(controller.signal);
+    fetchExpensesTotal(controller.signal);
     return () => controller.abort();
-  }, [fetchPayments]);
+  }, [fetchPayments, fetchExpensesTotal]);
 
   async function generatePayments() {
     setGenerating(true);
