@@ -27,9 +27,10 @@ import {
   RefreshCw,
   Send,
   MessageSquare,
-  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DatePicker } from "@/components/DatePicker";
+import { TableRowSkeleton } from "@/components/skeletons";
 
 interface NotificationEntry {
   id: number;
@@ -108,7 +109,7 @@ export default function NotificationsPage() {
     return new Date(iso).toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata",
       day: "2-digit",
-      month: "short",
+      month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -187,24 +188,19 @@ export default function NotificationsPage() {
           </div>
 
           {/* Date filters */}
-          <div className="flex gap-2 mt-3">
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-8 w-36 text-xs bg-muted/50"
-                placeholder="From"
-              />
-            </div>
-            <span className="text-muted-foreground self-center text-xs">to</span>
-            <Input
-              type="date"
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder="From date"
+              className="h-8 w-40 text-xs"
+            />
+            <span className="text-muted-foreground text-xs">to</span>
+            <DatePicker
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-8 w-36 text-xs bg-muted/50"
-              placeholder="To"
+              onChange={setDateTo}
+              placeholder="To date"
+              className="h-8 w-40 text-xs"
             />
             {(dateFrom || dateTo) && (
               <Button
@@ -220,9 +216,10 @@ export default function NotificationsPage() {
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Loading…</span>
+            <div className="py-4 px-4">
+              <table className="w-full">
+                <tbody><TableRowSkeleton cols={6} rows={6} /></tbody>
+              </table>
             </div>
           ) : entries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">

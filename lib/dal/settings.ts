@@ -4,6 +4,8 @@ export interface Settings {
   default_monthly_rate: number;
   grace_period_days: number;
   daily_fine_amount: number;
+  /** false = cron will skip voice calls entirely */
+  voice_reminders_enabled: boolean;
 }
 
 /** Load all settings as a typed object */
@@ -14,9 +16,10 @@ export async function getSettings(): Promise<Settings> {
     map[r.key] = r.value;
   }
   return {
-    default_monthly_rate: Number(map.default_monthly_rate ?? 3000),
-    grace_period_days:    Number(map.grace_period_days    ?? 30),
-    daily_fine_amount:    Number(map.daily_fine_amount     ?? 50),
+    default_monthly_rate:    Number(map.default_monthly_rate ?? 3000),
+    grace_period_days:       Number(map.grace_period_days    ?? 30),
+    daily_fine_amount:       Number(map.daily_fine_amount     ?? 50),
+    voice_reminders_enabled: (map.voice_reminders_enabled ?? "true") !== "false",
   };
 }
 
