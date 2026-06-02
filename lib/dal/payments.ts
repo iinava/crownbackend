@@ -132,6 +132,25 @@ export async function markPaymentPaid(paymentId: number): Promise<Payment | null
   return (rows[0] as Payment) ?? null;
 }
 
+export async function undoPaymentPaid(paymentId: number): Promise<Payment | null> {
+  const rows = await sql`
+    UPDATE payments p
+    SET 
+      paid = false, 
+      paid_at = NULL,
+      fine_amount = CASE
+        WHEN p.due_date IS NULL THEN 0
+        ELSE GREATEST(0, (NOW() AT TIME ZONE 'Asia/Kolkata')::date - p.due_date::date) 
+             * COALESCE((SELECT value::numeric FROM settings WHERE key = 'daily_fine_amount'), 0)
+      END
+    WHERE id = ${paymentId}
+      AND paid = true
+    RETURNING *
+  `;
+  return (rows[0] as Payment) ?? null;
+}
+
+
 /**
  * Update editable fields on a payment record (amount and/or fine).
  */
@@ -142,9 +161,7 @@ export async function updatePaymentFields(
   const rows = await sql`
     UPDATE payments SET
       amount      = COALESCE(${fields.amount ?? null}::numeric, amount),
-      fine_amount = COALESCE(${fields.fine_amount ?? null}::numeric, fine_amount),
-      total_due   = COALESCE(${fields.amount ?? null}::numeric, amount)
-                  + COALESCE(${fields.fine_amount ?? null}::numeric, fine_amount)
+      fine_amount = COALESCE(${fields.fine_amount ?? null}::numeric, fine_amount)
     WHERE id = ${paymentId}
       AND paid = false
     RETURNING *
