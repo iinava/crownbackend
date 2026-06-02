@@ -42,27 +42,33 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
   const [assigning, setAssigning] = useState(false);
   const [vacating, setVacating] = useState(false);
 
-  // Load all active residents once when the sheet opens
+  // Server-side search: fetch matching unassigned residents from the API
+  // Debounced so we don't hammer the DB on every keystroke
   useEffect(() => {
     if (!open) return;
-    setLoadingResidents(true);
-    fetch(`/api/residents?limit=200&active_only=true`)
-      .then((r) => r.json())
-      .then((data) => setAllResidents(data.data ?? []))
-      .catch(() => setAllResidents([]))
-      .finally(() => setLoadingResidents(false));
-  }, [open]);
 
-  // Client-side filter — only unassigned residents, matching search
-  const results = allResidents.filter((r) => {
-    if (r.bed_number) return false; // already assigned elsewhere
-    if (search.trim().length === 0) return true;
-    const q = search.toLowerCase();
-    return (
-      r.name.toLowerCase().includes(q) ||
-      (r.phone ?? "").toLowerCase().includes(q)
-    );
-  });
+    setLoadingResidents(true);
+    const trimmed = search.trim();
+
+    const params = new URLSearchParams({
+      active_only: "true",
+      limit: "50",
+    });
+    if (trimmed) params.set("search", trimmed);
+
+    const timeout = setTimeout(() => {
+      fetch(`/api/residents?${params.toString()}`)
+        .then((r) => r.json())
+        .then((data) => setAllResidents(data.data ?? []))
+        .catch(() => setAllResidents([]))
+        .finally(() => setLoadingResidents(false));
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [open, search]);
+
+  // Only exclude residents who already have a bed — server handles the name/phone search
+  const results = allResidents.filter((r) => !r.bed_number);
 
   const handleBedClick = useCallback((bed: Bed) => {
     setSelectedBed(bed);
