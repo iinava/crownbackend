@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Loader2, AlertCircle, RefreshCw, Check,
-  IndianRupee, CheckCircle2, Clock, Flame, Pencil,
+  IndianRupee, CheckCircle2, Clock, Flame, Pencil, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -165,6 +165,25 @@ function PaymentsInner() {
         fetchPayments();
       } else {
         toast.error("Failed to mark paid");
+      }
+    } finally {
+      setMarkingId(null);
+    }
+  }
+
+  async function undoPaid(payment: Payment) {
+    setMarkingId(payment.id);
+    try {
+      const res = await fetch(`/api/payments/${payment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paid: false }),
+      });
+      if (res.ok) {
+        toast.success(`Payment status undone for ${payment.resident_name}`);
+        fetchPayments();
+      } else {
+        toast.error("Failed to undo payment");
       }
     } finally {
       setMarkingId(null);
@@ -536,7 +555,17 @@ function PaymentsInner() {
                         </TableCell>
 
                         <TableCell>
-                          {!p.paid && (
+                          {p.paid ? (
+                            <Button
+                              size="sm" variant="ghost"
+                              className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => undoPaid(p)}
+                              disabled={isMarking}
+                            >
+                              {isMarking ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                              Undo
+                            </Button>
+                          ) : (
                             <Button
                               size="sm" variant="outline"
                               className="h-7 gap-1.5 text-xs border-success/30 text-success hover:bg-success/10"

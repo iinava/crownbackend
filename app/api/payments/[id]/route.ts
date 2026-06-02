@@ -1,4 +1,4 @@
-import { markPaymentPaid, updatePaymentNotes, updatePaymentFields } from "@/lib/dal/payments";
+import { markPaymentPaid, undoPaymentPaid, updatePaymentNotes, updatePaymentFields } from "@/lib/dal/payments";
 import { NextRequest } from "next/server";
 
 export async function PATCH(
@@ -11,6 +11,12 @@ export async function PATCH(
   if (body.paid === true) {
     const updated = await markPaymentPaid(Number(id));
     if (!updated) return Response.json({ error: "Payment not found" }, { status: 404 });
+    return Response.json(updated);
+  }
+
+  if (body.paid === false) {
+    const updated = await undoPaymentPaid(Number(id));
+    if (!updated) return Response.json({ error: "Payment not found or not marked as paid" }, { status: 404 });
     return Response.json(updated);
   }
 
