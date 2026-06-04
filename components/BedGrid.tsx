@@ -26,6 +26,7 @@ interface Resident {
   name: string;
   phone: string | null;
   bed_number: string | null;
+  is_staff: boolean;
 }
 
 interface BedGridProps {
@@ -65,8 +66,7 @@ const getAvatarColor = (name: string) => {
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % colors.length;
-  return colors[index];
+  return colors[Math.abs(hash) % colors.length];
 };
 
 export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
@@ -78,18 +78,14 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
   const [assigning, setAssigning] = useState(false);
   const [vacating, setVacating] = useState(false);
 
-  // Server-side search: fetch matching unassigned residents from the API
-  // Debounced so we don't hammer the DB on every keystroke
+  // Fetch all active people (residents + staff) — no is_staff filter, so both come back
   useEffect(() => {
     if (!open) return;
 
     setLoadingResidents(true);
     const trimmed = search.trim();
 
-    const params = new URLSearchParams({
-      active_only: "true",
-      limit: "50",
-    });
+    const params = new URLSearchParams({ active_only: "true", limit: "50" });
     if (trimmed) params.set("search", trimmed);
 
     const timeout = setTimeout(() => {
@@ -103,17 +99,13 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
     return () => clearTimeout(timeout);
   }, [open, search]);
 
-  // Only exclude residents who already have a bed — server handles the name/phone search
+  // Exclude anyone already assigned to a bed
   const results = allResidents.filter((r) => !r.bed_number);
 
   const handleBedClick = useCallback((bed: Bed) => {
     setSelectedBed(bed);
     setSearch("");
     setOpen(true);
-  }, []);
-
-  const handleSearch = useCallback((q: string) => {
-    setSearch(q);
   }, []);
 
   const handleAssign = useCallback(async (residentId: number) => {
@@ -156,7 +148,6 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
     }
   }, [selectedBed, onRefresh]);
 
-  // 5 rows × 4 cols layout
   const rows: Bed[][] = [];
   for (let i = 0; i < beds.length; i += 4) {
     rows.push(beds.slice(i, i + 4));
@@ -256,13 +247,14 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
               <p className="text-sm font-semibold tracking-tight text-foreground/90">
                 {selectedBed?.is_occupied ? "Reassign to:" : "Assign resident:"}
               </p>
+
               <div className="relative group/search">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/80 group-focus-within/search:text-primary transition-colors duration-200" />
                 <Input
                   className="pl-9 h-10 rounded-xl bg-muted/20 border-border/60 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-all duration-200"
                   placeholder="Search by name or phone..."
                   value={search}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
 
@@ -281,7 +273,7 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                     disabled={assigning}
                     className="w-full flex items-center gap-3 rounded-xl border border-border/50 bg-card p-3 text-sm text-left hover:bg-accent/40 hover:border-primary/30 hover:shadow-sm transition-all duration-200 group disabled:opacity-50 cursor-pointer"
                   >
-                    {/* Avatar / Initials */}
+                    {/* Avatar */}
                     <div className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold uppercase tracking-wider transition-transform duration-200 group-hover:scale-105",
                       getAvatarColor(r.name)
@@ -289,19 +281,22 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                       {getInitials(r.name)}
                     </div>
 
-                    {/* Resident Details */}
+                    {/* Details */}
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground group-hover:text-primary transition-colors duration-200 truncate">
-                        {formatName(r.name)}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-foreground group-hover:text-primary transition-colors duration-200 truncate">
+                          {formatName(r.name)}
+                        </p>
+                        {r.is_staff && (
+                          <Badge className="h-4 px-1.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-800/50">
+                            Staff
+                          </Badge>
+                        )}
+                      </div>
                       {r.phone ? (
-                        <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                          {r.phone}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 font-medium">{r.phone}</p>
                       ) : (
-                        <p className="text-xs text-muted-foreground/60 italic mt-0.5">
-                          No phone number
-                        </p>
+                        <p className="text-xs text-muted-foreground/60 italic mt-0.5">No phone number</p>
                       )}
                     </div>
 
@@ -315,10 +310,11 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                     </div>
                   </button>
                 ))}
+
                 {!loadingResidents && results.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-10 px-4 border border-dashed rounded-xl border-border/60 bg-muted/10 text-center animate-in fade-in-50 duration-300">
                     <p className="text-sm font-semibold text-muted-foreground">
-                      {search.length > 0 ? "No matching residents" : "No active residents found"}
+                      {search.length > 0 ? "No matching results" : "No active residents found"}
                     </p>
                     <p className="text-xs text-muted-foreground/60 mt-1 max-w-[200px]">
                       {search.length > 0 ? "Try adjusting your spelling or search term" : "Check back later or register a new resident"}
