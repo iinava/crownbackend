@@ -44,7 +44,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
   data: Resident[];
   total: number;
 }> {
-  const { search = "", limit = 20, offset = 0, activeOnly = false, inactiveOnly = false, isStaff = false, hostelId } = params;
+  const { search = "", limit = 20, offset = 0, activeOnly = false, inactiveOnly = false, isStaff, hostelId } = params;
   const searchPattern = `%${search}%`;
 
   const data = await sql`
@@ -78,7 +78,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
       AND (${inactiveOnly} = false OR r.is_active = false)
-      AND r.is_staff = ${isStaff}
+      AND (${isStaff ?? null}::boolean IS NULL OR r.is_staff = ${isStaff ?? null})
       AND (
         ${hostelId ?? null}::int IS NULL
         -- Unassigned residents: always show regardless of hostel filter
@@ -104,7 +104,7 @@ export async function getResidents(params: ResidentListParams = {}): Promise<{
       (${search} = '' OR r.name ILIKE ${searchPattern} OR r.phone ILIKE ${searchPattern} OR r.email ILIKE ${searchPattern})
       AND (${activeOnly} = false OR r.is_active = true)
       AND (${inactiveOnly} = false OR r.is_active = false)
-      AND r.is_staff = ${isStaff}
+      AND (${isStaff ?? null}::boolean IS NULL OR r.is_staff = ${isStaff ?? null})
       AND (
         ${hostelId ?? null}::int IS NULL
         OR NOT EXISTS (SELECT 1 FROM bed_assignments ba_chk WHERE ba_chk.resident_id = r.id)
