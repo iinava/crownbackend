@@ -122,7 +122,6 @@ function PaymentsInner() {
       const data = await res.json();
       setPayments(data.data ?? []);
       setTotal(data.total ?? 0);
-      if (data.stats) setStats(data.stats);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Payments fetch failed:", err);
@@ -131,6 +130,21 @@ function PaymentsInner() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, hostelParam, hostelLoading, searchQuery, currentPage]);
+
+  // Stats fetch — no search param so cards always reflect the full month totals
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
+    if (hostelLoading) return;
+    try {
+      const hq  = hostelParam ? `&hostel=${hostelParam}` : "";
+      const res = await fetch(`/api/payments?month=${month}-01&limit=0${hq}`, { signal });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.stats) setStats(data.stats);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, hostelParam, hostelLoading]);
 
   const fetchExpensesTotal = useCallback(async (signal?: AbortSignal) => {
     if (hostelLoading) return;
@@ -147,12 +161,20 @@ function PaymentsInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, hostelParam, hostelLoading]);
 
+  // Table rows: re-fetch on month / hostel / search / page change
   useEffect(() => {
     const controller = new AbortController();
     fetchPayments(controller.signal);
+    return () => controller.abort();
+  }, [fetchPayments]);
+
+  // Stat cards + expenses: only re-fetch on month / hostel change (never search)
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchStats(controller.signal);
     fetchExpensesTotal(controller.signal);
     return () => controller.abort();
-  }, [fetchPayments, fetchExpensesTotal]);
+  }, [fetchStats, fetchExpensesTotal]);
 
   async function generatePayments() {
     setGenerating(true);
@@ -169,6 +191,7 @@ function PaymentsInner() {
         toast.success(`Generated ${data.generated} payment record${data.generated !== 1 ? "s" : ""}`);
       }
       fetchPayments();
+      fetchStats();
     } finally {
       setGenerating(false);
     }
@@ -181,6 +204,7 @@ function PaymentsInner() {
       const data = await res.json();
       toast.success(`Fines updated for ${data.updated} overdue payment${data.updated !== 1 ? "s" : ""}`);
       fetchPayments();
+      fetchStats();
     } finally {
       setRecalculating(false);
     }
@@ -197,6 +221,7 @@ function PaymentsInner() {
       if (res.ok) {
         toast.success(`${payment.resident_name} marked as paid`);
         fetchPayments();
+        fetchStats();
       } else {
         toast.error("Failed to mark paid");
       }
@@ -216,6 +241,7 @@ function PaymentsInner() {
       if (res.ok) {
         toast.success(`Payment status undone for ${payment.resident_name}`);
         fetchPayments();
+        fetchStats();
       } else {
         toast.error("Failed to undo payment");
       }
@@ -236,6 +262,7 @@ function PaymentsInner() {
       if (res.ok) {
         toast.success(`${editField === "amount" ? "Rent" : "Fine"} updated for ${payment.resident_name}`);
         fetchPayments();
+        fetchStats();
       } else {
         toast.error("Failed to update");
       }
