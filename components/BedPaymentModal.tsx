@@ -36,8 +36,12 @@ export function BedPaymentModal({ open, onOpenChange, residentId, residentName, 
   async function fetchPayment() {
     setLoading(true);
     try {
-      const month = new Date().toISOString().slice(0, 7) + "-01";
-      const res = await fetch(`/api/payments?resident_id=${residentId}&month=${month}`);
+      const date = new Date();
+      const year = date.toLocaleString("en-US", { year: "numeric", timeZone: "Asia/Kolkata" });
+      const monthNum = date.toLocaleString("en-US", { month: "2-digit", timeZone: "Asia/Kolkata" });
+      const monthStr = `${year}-${monthNum}-01`;
+      
+      const res = await fetch(`/api/payments?resident_id=${residentId}&month=${monthStr}`);
       const data = await res.json();
       if (data.data && data.data.length > 0) {
         setPaymentData(data.data[0]);
