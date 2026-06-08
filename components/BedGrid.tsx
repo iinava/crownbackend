@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { BedDouble, Search, UserPlus, UserX, Loader2, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { BedPaymentModal } from "@/components/BedPaymentModal";
 
 interface Bed {
   id: number;
@@ -20,6 +21,8 @@ interface Bed {
   resident_phone: string | null;
   assignment_id: number | null;
   is_staff: boolean;
+  payment_id: number | null;
+  payment_paid: boolean | null;
 }
 
 interface Resident {
@@ -79,6 +82,9 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
   const [assigning, setAssigning] = useState(false);
   const [vacating, setVacating] = useState(false);
   const [pendingResident, setPendingResident] = useState<Resident | null>(null);
+  
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedPaymentBed, setSelectedPaymentBed] = useState<Bed | null>(null);
 
   // Fetch all active people (residents + staff) — no is_staff filter, so both come back
   useEffect(() => {
@@ -108,6 +114,11 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
     setSelectedBed(bed);
     setSearch("");
     setOpen(true);
+  }, []);
+
+  const handlePaymentClick = useCallback((bed: Bed) => {
+    setSelectedPaymentBed(bed);
+    setPaymentModalOpen(true);
   }, []);
 
   const handleAssign = useCallback(async (residentId: number) => {
@@ -205,9 +216,27 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                   <BedDouble className="h-4 w-4 mb-1 shrink-0" />
                   <span className="font-semibold text-[11px]">{bed.number.split("-").slice(1).join("-")}</span>
                   {bed.is_occupied && bed.resident_name ? (
-                    <span className={cn("truncate w-full text-center text-[10px] leading-tight mt-0.5", bed.is_staff ? "text-purple-700 dark:text-purple-400/90" : "text-success/80")}>
-                      {bed.resident_name.split(" ")[0]}
-                    </span>
+                    <>
+                      <span className={cn("truncate w-full text-center text-[10px] leading-tight mt-0.5", bed.is_staff ? "text-purple-700 dark:text-purple-400/90" : "text-success/80")}>
+                        {bed.resident_name.split(" ")[0]}
+                      </span>
+                      {!bed.is_staff && bed.payment_id !== null && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePaymentClick(bed);
+                          }}
+                          className={cn(
+                            "mt-0.5 text-[9px] px-1.5 py-px rounded shadow-sm border transition-colors cursor-pointer",
+                            bed.payment_paid 
+                              ? "bg-success/20 text-success border-success/30 hover:bg-success/30" 
+                              : "bg-warning/20 text-warning border-warning/30 hover:bg-warning/30"
+                          )}
+                        >
+                          {bed.payment_paid ? "Paid" : "Mark as paid"}
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <span className="text-[10px] text-muted-foreground/60">Empty</span>
                   )}
@@ -378,6 +407,14 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BedPaymentModal
+        open={paymentModalOpen}
+        onOpenChange={setPaymentModalOpen}
+        residentId={selectedPaymentBed?.resident_id ?? null}
+        residentName={selectedPaymentBed?.resident_name ?? null}
+        onSuccess={onRefresh}
+      />
     </>
   );
 }

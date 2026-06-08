@@ -72,6 +72,8 @@ export interface BedWithResident {
   resident_phone: string | null;
   assignment_id: number | null;
   is_staff: boolean;
+  payment_id: number | null;
+  payment_paid: boolean | null;
 }
 
 export async function getRoomWithBeds(roomId: number): Promise<BedWithResident[]> {
@@ -83,10 +85,13 @@ export async function getRoomWithBeds(roomId: number): Promise<BedWithResident[]
       res.name AS resident_name,
       res.phone AS resident_phone,
       COALESCE(res.is_staff, false) AS is_staff,
-      ba.id AS assignment_id
+      ba.id AS assignment_id,
+      p.id AS payment_id,
+      p.paid AS payment_paid
     FROM beds b
     LEFT JOIN bed_assignments ba ON ba.bed_id = b.id AND ba.vacated_at IS NULL
     LEFT JOIN residents res ON res.id = ba.resident_id
+    LEFT JOIN payments p ON p.resident_id = res.id AND p.month = DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata'))::date
     WHERE b.room_id = ${roomId}
     ORDER BY b.position
   `;

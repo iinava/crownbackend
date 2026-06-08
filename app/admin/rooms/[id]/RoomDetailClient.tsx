@@ -19,6 +19,8 @@ interface Bed {
   resident_phone: string | null;
   assignment_id: number | null;
   is_staff: boolean;
+  payment_id: number | null;
+  payment_paid: boolean | null;
 }
 
 interface Room {
