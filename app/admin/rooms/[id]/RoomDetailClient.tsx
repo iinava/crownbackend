@@ -21,6 +21,8 @@ interface Bed {
   is_staff: boolean;
   payment_id: number | null;
   payment_paid: boolean | null;
+  payment_amount: number | null;
+  payment_fine: number | null;
 }
 
 interface Room {

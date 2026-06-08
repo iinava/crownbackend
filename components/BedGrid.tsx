@@ -23,6 +23,8 @@ interface Bed {
   is_staff: boolean;
   payment_id: number | null;
   payment_paid: boolean | null;
+  payment_amount: number | null;
+  payment_fine: number | null;
 }
 
 interface Resident {
@@ -221,19 +223,13 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
                         {bed.resident_name.split(" ")[0]}
                       </span>
                       {!bed.is_staff && bed.payment_id !== null && (
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePaymentClick(bed);
-                          }}
-                          className={cn(
-                            "mt-0.5 text-[9px] px-1.5 py-px rounded shadow-sm border transition-colors cursor-pointer",
-                            bed.payment_paid 
-                              ? "bg-success/20 text-success border-success/30 hover:bg-success/30" 
-                              : "bg-warning/20 text-warning border-warning/30 hover:bg-warning/30"
-                          )}
-                        >
-                          {bed.payment_paid ? "Paid" : "Mark as paid"}
+                        <div className={cn(
+                          "mt-0.5 text-[8.5px] px-1.5 py-[1px] rounded font-semibold tracking-wide border",
+                          bed.payment_paid
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-warning/10 text-warning border-warning/20"
+                        )}>
+                          ₹{(Number(bed.payment_amount || 0) + Number(bed.payment_fine || 0)).toLocaleString()} {bed.payment_paid ? "✓" : "!"}
                         </div>
                       )}
                     </>
@@ -273,15 +269,38 @@ export default function BedGrid({ beds, roomNumber, onRefresh }: BedGridProps) {
 
           <div className="mt-6 space-y-4">
             {selectedBed?.is_occupied && (
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={handleVacate}
-                disabled={vacating}
-              >
-                {vacating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
-                Vacate Bed
-              </Button>
+              <div className="grid grid-cols-1 gap-2 border-b border-border/50 pb-4 mb-2">
+                {!selectedBed.is_staff && (
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full gap-2 border shadow-sm",
+                      selectedBed.payment_id !== null
+                        ? selectedBed.payment_paid
+                          ? "border-success/30 text-success hover:bg-success/10 bg-success/5"
+                          : "border-warning/30 text-warning hover:bg-warning/10 bg-warning/5"
+                        : "border-primary/30 text-primary hover:bg-primary/10"
+                    )}
+                    onClick={() => handlePaymentClick(selectedBed)}
+                  >
+                    {selectedBed.payment_id !== null
+                      ? selectedBed.payment_paid
+                        ? "View Payment (Paid)"
+                        : "Manage Payment (Pending)"
+                      : "Manage Payment"}
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-destructive/20 text-destructive hover:bg-destructive/10"
+                  onClick={handleVacate}
+                  disabled={vacating}
+                >
+                  {vacating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4" />}
+                  Vacate Bed
+                </Button>
+              </div>
             )}
 
             <div className="space-y-3">
