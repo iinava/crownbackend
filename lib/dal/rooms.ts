@@ -21,6 +21,7 @@ export interface Room {
   hostel_id?: number;
   hostel_name?: string;
   occupied_count: number;
+  pending_payments_count?: number;
 }
 
 export async function getAllRooms(hostelId?: number): Promise<Room[]> {
@@ -32,12 +33,15 @@ export async function getAllRooms(hostelId?: number): Promise<Room[]> {
       f.label AS floor_label,
       f.hostel_id,
       h.name AS hostel_name,
-      COUNT(ba.id)::int AS occupied_count
+      COUNT(ba.id)::int AS occupied_count,
+      COUNT(CASE WHEN p.paid = false AND COALESCE(res.is_staff, false) = false THEN 1 END)::int AS pending_payments_count
     FROM rooms r
     JOIN floors f ON f.id = r.floor_id
     JOIN hostels h ON h.id = f.hostel_id
     LEFT JOIN beds b ON b.room_id = r.id
     LEFT JOIN bed_assignments ba ON ba.bed_id = b.id AND ba.vacated_at IS NULL
+    LEFT JOIN residents res ON res.id = ba.resident_id
+    LEFT JOIN payments p ON p.resident_id = ba.resident_id AND p.month = DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata'))::date
     WHERE (${hostelId ?? null}::int IS NULL OR f.hostel_id = ${hostelId ?? null})
     GROUP BY r.id, f.name, f.label, f.hostel_id, h.name
     ORDER BY f.name, r.number
@@ -72,6 +76,10 @@ export interface BedWithResident {
   resident_phone: string | null;
   assignment_id: number | null;
   is_staff: boolean;
+  payment_id: number | null;
+  payment_paid: boolean | null;
+  payment_amount: number | null;
+  payment_fine: number | null;
 }
 
 export async function getRoomWithBeds(roomId: number): Promise<BedWithResident[]> {
@@ -83,10 +91,15 @@ export async function getRoomWithBeds(roomId: number): Promise<BedWithResident[]
       res.name AS resident_name,
       res.phone AS resident_phone,
       COALESCE(res.is_staff, false) AS is_staff,
-      ba.id AS assignment_id
+      ba.id AS assignment_id,
+      p.id AS payment_id,
+      p.paid AS payment_paid,
+      p.amount AS payment_amount,
+      p.fine_amount AS payment_fine
     FROM beds b
     LEFT JOIN bed_assignments ba ON ba.bed_id = b.id AND ba.vacated_at IS NULL
     LEFT JOIN residents res ON res.id = ba.resident_id
+    LEFT JOIN payments p ON p.resident_id = res.id AND p.month = DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata'))::date
     WHERE b.room_id = ${roomId}
     ORDER BY b.position
   `;
