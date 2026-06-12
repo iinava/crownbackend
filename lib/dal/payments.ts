@@ -6,6 +6,7 @@ export interface Payment {
   amount: string;          // rent amount (from resident's monthly_rate)
   due_date: string | null; // 5th of the payment month (null for dorm residents)
   fine_amount: string;     // accrued daily fine
+  fine_paid: string;       // fine captured at the moment of payment
   month: string;
   paid: boolean;
   paid_at: string | null;
@@ -39,6 +40,7 @@ export async function getPayments(filters: {
     count_unpaid: number;
     count_overdue: number;
     sum_collected: number;
+    sum_fines_collected: number;
     sum_pending: number;
     sum_fines: number;
   };
@@ -113,7 +115,8 @@ export async function getPayments(filters: {
           AND p.due_date IS NOT NULL
           AND (NOW() AT TIME ZONE 'Asia/Kolkata')::date > p.due_date::date
       )::int                                                                                     AS count_overdue,
-      COALESCE(SUM(p.amount)   FILTER (WHERE p.paid = true),  0)::numeric                       AS sum_collected,
+      COALESCE(SUM(p.amount + p.fine_paid) FILTER (WHERE p.paid = true),  0)::numeric           AS sum_collected,
+      COALESCE(SUM(p.fine_paid)            FILTER (WHERE p.paid = true),  0)::numeric           AS sum_fines_collected,
       COALESCE(SUM(p.amount + p.fine_amount) FILTER (WHERE p.paid = false), 0)::numeric         AS sum_pending,
       COALESCE(SUM(p.fine_amount) FILTER (WHERE p.paid = false), 0)::numeric                    AS sum_fines
     FROM payments p
@@ -148,13 +151,14 @@ export async function getPayments(filters: {
     data: data as Payment[],
     total: Number(s.count_total),
     stats: {
-      count_total:   Number(s.count_total),
-      count_paid:    Number(s.count_paid),
-      count_unpaid:  Number(s.count_unpaid),
-      count_overdue: Number(s.count_overdue),
-      sum_collected: Number(s.sum_collected),
-      sum_pending:   Number(s.sum_pending),
-      sum_fines:     Number(s.sum_fines),
+      count_total:        Number(s.count_total),
+      count_paid:         Number(s.count_paid),
+      count_unpaid:       Number(s.count_unpaid),
+      count_overdue:      Number(s.count_overdue),
+      sum_collected:      Number(s.sum_collected),
+      sum_fines_collected: Number(s.sum_fines_collected),
+      sum_pending:        Number(s.sum_pending),
+      sum_fines:          Number(s.sum_fines),
     },
   };
 }
@@ -182,7 +186,7 @@ export async function getUnpaidThisMonth(hostelId?: number): Promise<Payment[]> 
 export async function markPaymentPaid(paymentId: number): Promise<Payment | null> {
   const rows = await sql`
     UPDATE payments 
-    SET paid = true, paid_at = NOW(), fine_amount = 0
+    SET paid = true, paid_at = NOW(), fine_paid = fine_amount, fine_amount = 0
     WHERE id = ${paymentId}
     RETURNING *
   `;
@@ -195,6 +199,7 @@ export async function undoPaymentPaid(paymentId: number): Promise<Payment | null
     SET 
       paid = false, 
       paid_at = NULL,
+      fine_paid = 0,
       fine_amount = CASE
         WHEN p.due_date IS NULL THEN 0
         ELSE GREATEST(0, (NOW() AT TIME ZONE 'Asia/Kolkata')::date - p.due_date::date) 

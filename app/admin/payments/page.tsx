@@ -75,7 +75,7 @@ function PaymentsInner() {
   const [total, setTotal]                 = useState(0);
   const [stats, setStats] = useState({
     count_total: 0, count_paid: 0, count_unpaid: 0, count_overdue: 0,
-    sum_collected: 0, sum_pending: 0, sum_fines: 0,
+    sum_collected: 0, sum_fines_collected: 0, sum_pending: 0, sum_fines: 0,
   });
   const [loading, setLoading]             = useState(true);
   const [generating, setGenerating]       = useState(false);
@@ -385,7 +385,12 @@ function PaymentsInner() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Collected</p>
                   <p className="text-base sm:text-xl font-bold truncate">₹{stats.sum_collected.toLocaleString("en-IN")}</p>
-                  <p className="text-[10px] text-muted-foreground">{stats.count_paid} paid</p>
+                 
+                    <p className="text-[10px] text-warning/80 flex items-center gap-0.5">
+                      <Flame className="h-2.5 w-2.5" />
+                      incl. ₹{stats.sum_fines_collected.toLocaleString("en-IN")} fines
+                    </p>
+                
                 </div>
               </CardContent>
             </Card>
