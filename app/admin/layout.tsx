@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           
           {/* Main Content Scroll Area */}
           <div className="flex-1 overflow-y-auto">
-            <div className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+            <div className="p-4 md:p-6 lg:p-8  mx-auto w-full">
               {children}
             </div>
           </div>

@@ -171,13 +171,13 @@ export default function ExpensesTab({ month, hostelParam, hostelLoading, onTotal
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Expenses */}
         <Card className="border-border/60">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
             <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
               <TrendingDown className="h-4 w-4 text-destructive" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Total Expenses</p>
-              <p className="text-xl font-bold">₹{totalExpenses.toLocaleString("en-IN")}</p>
+              <p className="text-base sm:text-xl font-bold truncate">₹{totalExpenses.toLocaleString("en-IN")}</p>
               <p className="text-[10px] text-muted-foreground">{expenses.length} transaction{expenses.length !== 1 ? "s" : ""}</p>
             </div>
           </CardContent>
@@ -185,13 +185,13 @@ export default function ExpensesTab({ month, hostelParam, hostelLoading, onTotal
 
         {/* Dynamic Card 2: Transactions Count */}
         <Card className="border-border/60">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
             <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Receipt className="h-4 w-4 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Expenses Logged</p>
-              <p className="text-xl font-bold">{expenses.length}</p>
+              <p className="text-base sm:text-xl font-bold truncate">{expenses.length}</p>
               <p className="text-[10px] text-muted-foreground">items this month</p>
             </div>
           </CardContent>
@@ -199,16 +199,16 @@ export default function ExpensesTab({ month, hostelParam, hostelLoading, onTotal
 
         {/* Dynamic Card 3: Largest Expense */}
         <Card className="border-border/60">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
             <div className="h-9 w-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
               <Coins className="h-4 w-4 text-warning" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Largest Expense</p>
-              <p className="text-xl font-bold">
+              <p className="text-base sm:text-xl font-bold truncate">
                 {largestExpense ? `₹${Number(largestExpense.amount).toLocaleString("en-IN")}` : "—"}
               </p>
-              <p className="text-[10px] text-muted-foreground truncate max-w-[130px]" title={largestExpense?.title ?? ""}>
+              <p className="text-[10px] text-muted-foreground truncate" title={largestExpense?.title ?? ""}>
                 {largestExpense ? largestExpense.title : "No records yet"}
               </p>
             </div>
@@ -217,16 +217,16 @@ export default function ExpensesTab({ month, hostelParam, hostelLoading, onTotal
 
         {/* Dynamic Card 4: Top Category */}
         <Card className="border-border/60">
-          <CardContent className="p-4 flex items-center gap-3">
+          <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
             <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
               <Tag className="h-4 w-4 text-purple-500" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Top Category</p>
-              <p className="text-xl font-bold truncate max-w-[130px]">
+              <p className="text-base sm:text-xl font-bold truncate">
                 {topCategory ? (CAT_LABELS[topCategory] ?? topCategory) : "—"}
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground truncate">
                 {topCategory ? `₹${topCategoryAmount.toLocaleString("en-IN")} spent` : "No records yet"}
               </p>
             </div>

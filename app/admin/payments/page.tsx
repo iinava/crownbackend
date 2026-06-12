@@ -378,52 +378,52 @@ function PaymentsInner() {
           {/* ── Stat cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="border-border/60">
-              <CardContent className="p-4 flex items-center gap-3">
+              <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
                 <div className="h-9 w-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="h-4 w-4 text-success" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Collected</p>
-                  <p className="text-xl font-bold">₹{stats.sum_collected.toLocaleString("en-IN")}</p>
+                  <p className="text-base sm:text-xl font-bold truncate">₹{stats.sum_collected.toLocaleString("en-IN")}</p>
                   <p className="text-[10px] text-muted-foreground">{stats.count_paid} paid</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-border/60">
-              <CardContent className="p-4 flex items-center gap-3">
+              <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
                 <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
                   <Clock className="h-4 w-4 text-destructive" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Pending</p>
-                  <p className="text-xl font-bold">₹{stats.sum_pending.toLocaleString("en-IN")}</p>
+                  <p className="text-base sm:text-xl font-bold truncate">₹{stats.sum_pending.toLocaleString("en-IN")}</p>
                   <p className="text-[10px] text-muted-foreground">{stats.count_unpaid} unpaid</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-border/60">
-              <CardContent className="p-4 flex items-center gap-3">
+              <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
                 <div className="h-9 w-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
                   <Flame className="h-4 w-4 text-warning" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Fines Accrued</p>
-                  <p className="text-xl font-bold">₹{stats.sum_fines.toLocaleString("en-IN")}</p>
+                  <p className="text-base sm:text-xl font-bold truncate">₹{stats.sum_fines.toLocaleString("en-IN")}</p>
                   <p className="text-[10px] text-muted-foreground">{stats.count_overdue} overdue</p>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-border/60">
-              <CardContent className="p-4 flex items-center gap-3">
+              <CardContent className="p-4 flex items-center gap-3 overflow-hidden">
                 <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <IndianRupee className="h-4 w-4 text-primary" />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-xl font-bold">{stats.count_paid} / {stats.count_total}</p>
+                  <p className="text-base sm:text-xl font-bold truncate">{stats.count_paid} / {stats.count_total}</p>
                   <p className="text-[10px] text-muted-foreground">paid of total</p>
                 </div>
               </CardContent>
